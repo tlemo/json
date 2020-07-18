@@ -1,11 +1,12 @@
 /*
     __ _____ _____ _____
  __|  |   __|     |   | |  JSON for Modern C++ (test suite)
-|  |  |__   |  |  | | | |  version 3.1.2
+|  |  |__   |  |  | | | |  version 3.8.0
 |_____|_____|_____|_|___|  https://github.com/nlohmann/json
 
 Licensed under the MIT License <http://opensource.org/licenses/MIT>.
-Copyright (c) 2013-2018 Niels Lohmann <http://nlohmann.me>.
+SPDX-License-Identifier: MIT
+Copyright (c) 2013-2019 Niels Lohmann <http://nlohmann.me>.
 
 Permission is hereby  granted, free of charge, to any  person obtaining a copy
 of this software and associated  documentation files (the "Software"), to deal
@@ -26,17 +27,31 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "catch.hpp"
+#include "doctest_compatibility.h"
 
 #define private public
 #include <nlohmann/json.hpp>
 using nlohmann::json;
+#undef private
 
-// shortcut to scan a string literal
-json::lexer::token_type scan_string(const char* s);
-json::lexer::token_type scan_string(const char* s)
+namespace
 {
-    return json::lexer(nlohmann::detail::input_adapter(s)).scan();
+// shortcut to scan a string literal
+json::lexer::token_type scan_string(const char* s, const bool ignore_comments = false);
+json::lexer::token_type scan_string(const char* s, const bool ignore_comments)
+{
+    auto ia = nlohmann::detail::input_adapter(s);
+    return nlohmann::detail::lexer<json, decltype(ia)>(std::move(ia), ignore_comments).scan();
+}
+}
+
+std::string get_error_message(const char* s, const bool ignore_comments = false);
+std::string get_error_message(const char* s, const bool ignore_comments)
+{
+    auto ia = nlohmann::detail::input_adapter(s);
+    auto lexer = nlohmann::detail::lexer<json, decltype(ia)>(std::move(ia), ignore_comments);
+    lexer.scan();
+    return lexer.get_error_message();
 }
 
 TEST_CASE("lexer class")
@@ -121,6 +136,8 @@ TEST_CASE("lexer class")
             // store scan() result
             const auto res = scan_string(s.c_str());
 
+            CAPTURE(s);
+
             switch (c)
             {
                 // single characters that are valid tokens
@@ -174,14 +191,55 @@ TEST_CASE("lexer class")
         CHECK((scan_string(s.c_str()) == json::lexer::token_type::value_string));
     }
 
-    /* NOTE: to_unicode function has been removed
-    SECTION("to_unicode")
+    SECTION("fail on comments")
     {
-        // lexer to call to_unicode on
-        json::lexer dummy_lexer("", 0);
-        CHECK(dummy_lexer.to_unicode(0x1F4A9) == "💩");
-        CHECK_THROWS_AS(dummy_lexer.to_unicode(0x200000), json::parse_error);
-        CHECK_THROWS_WITH(dummy_lexer.to_unicode(0x200000), "[json.exception.parse_error.103] parse error: code points above 0x10FFFF are invalid");
+        CHECK((scan_string("/", false) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("/", false) == "invalid literal");
+
+        CHECK((scan_string("/!", false) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("/!", false) == "invalid literal");
+        CHECK((scan_string("/*", false) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("/*", false) == "invalid literal");
+        CHECK((scan_string("/**", false) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("/**", false) == "invalid literal");
+
+        CHECK((scan_string("//", false) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("//", false) == "invalid literal");
+        CHECK((scan_string("/**/", false) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("/**/", false) == "invalid literal");
+        CHECK((scan_string("/** /", false) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("/** /", false) == "invalid literal");
+
+        CHECK((scan_string("/***/", false) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("/***/", false) == "invalid literal");
+        CHECK((scan_string("/* true */", false) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("/* true */", false) == "invalid literal");
+        CHECK((scan_string("/*/**/", false) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("/*/**/", false) == "invalid literal");
+        CHECK((scan_string("/*/* */", false) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("/*/* */", false) == "invalid literal");
     }
-    */
+
+    SECTION("ignore comments")
+    {
+        CHECK((scan_string("/", true) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("/", true) == "invalid comment; expecting '/' or '*' after '/'");
+
+        CHECK((scan_string("/!", true) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("/!", true) == "invalid comment; expecting '/' or '*' after '/'");
+        CHECK((scan_string("/*", true) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("/*", true) == "invalid comment; missing closing '*/'");
+        CHECK((scan_string("/**", true) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("/**", true) == "invalid comment; missing closing '*/'");
+
+        CHECK((scan_string("//", true) == json::lexer::token_type::end_of_input));
+        CHECK((scan_string("/**/", true) == json::lexer::token_type::end_of_input));
+        CHECK((scan_string("/** /", true) == json::lexer::token_type::parse_error));
+        CHECK(get_error_message("/** /", true) == "invalid comment; missing closing '*/'");
+
+        CHECK((scan_string("/***/", true) == json::lexer::token_type::end_of_input));
+        CHECK((scan_string("/* true */", true) == json::lexer::token_type::end_of_input));
+        CHECK((scan_string("/*/**/", true) == json::lexer::token_type::end_of_input));
+        CHECK((scan_string("/*/* */", true) == json::lexer::token_type::end_of_input));
+    }
 }

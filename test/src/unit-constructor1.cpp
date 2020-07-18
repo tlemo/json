@@ -1,11 +1,12 @@
 /*
     __ _____ _____ _____
  __|  |   __|     |   | |  JSON for Modern C++ (test suite)
-|  |  |__   |  |  | | | |  version 3.1.2
+|  |  |__   |  |  | | | |  version 3.8.0
 |_____|_____|_____|_|___|  https://github.com/nlohmann/json
 
 Licensed under the MIT License <http://opensource.org/licenses/MIT>.
-Copyright (c) 2013-2018 Niels Lohmann <http://nlohmann.me>.
+SPDX-License-Identifier: MIT
+Copyright (c) 2013-2019 Niels Lohmann <http://nlohmann.me>.
 
 Permission is hereby  granted, free of charge, to any  person obtaining a copy
 of this software and associated  documentation files (the "Software"), to deal
@@ -26,16 +27,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "catch.hpp"
+#include "doctest_compatibility.h"
+DOCTEST_GCC_SUPPRESS_WARNING("-Wfloat-equal")
 
 #define private public
 #include <nlohmann/json.hpp>
 using nlohmann::json;
+#undef private
 
 #include <deque>
 #include <forward_list>
 #include <fstream>
 #include <list>
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include <valarray>
@@ -110,6 +114,14 @@ TEST_CASE("constructors")
             json j(t);
             CHECK(j.type() == t);
             CHECK(j == 0.0);
+        }
+
+        SECTION("binary")
+        {
+            auto t = json::value_t::binary;
+            json j(t);
+            CHECK(j.type() == t);
+            CHECK(j == json::binary({}));
         }
     }
 
@@ -469,6 +481,23 @@ TEST_CASE("constructors")
         }
     }
 
+    SECTION("create a binary (explicit)")
+    {
+        SECTION("empty binary")
+        {
+            json::binary_t b{};
+            json j(b);
+            CHECK(j.type() == json::value_t::binary);
+        }
+
+        SECTION("filled binary")
+        {
+            json::binary_t b({1, 2, 3});
+            json j(b);
+            CHECK(j.type() == json::value_t::binary);
+        }
+    }
+
     SECTION("create an integer number (explicit)")
     {
         SECTION("uninitialized value")
@@ -809,6 +838,21 @@ TEST_CASE("constructors")
             CHECK(j.type() == json::value_t::number_float);
         }
 
+        SECTION("NaN")
+        {
+            // NaN is stored properly, but serialized to null
+            json::number_float_t n(std::numeric_limits<json::number_float_t>::quiet_NaN());
+            json j(n);
+            CHECK(j.type() == json::value_t::number_float);
+
+            // check round trip of NaN
+            json::number_float_t d = j;
+            CHECK((std::isnan(d) && std::isnan(n)) == true);
+
+            // check that NaN is serialized to null
+            CHECK(j.dump() == "null");
+        }
+
         SECTION("infinity")
         {
             // infinity is stored properly, but serialized to null
@@ -1048,9 +1092,10 @@ TEST_CASE("constructors")
 
             SECTION("object with error")
             {
-                CHECK_THROWS_AS(json::object({ {"one", 1}, {"two", 1u}, {"three", 2.2}, {"four", false}, 13 }),
+                json _;
+                CHECK_THROWS_AS(_ = json::object({ {"one", 1}, {"two", 1u}, {"three", 2.2}, {"four", false}, 13 }),
                 json::type_error&);
-                CHECK_THROWS_WITH(json::object({ {"one", 1}, {"two", 1u}, {"three", 2.2}, {"four", false}, 13 }),
+                CHECK_THROWS_WITH(_ = json::object({ {"one", 1}, {"two", 1u}, {"three", 2.2}, {"four", false}, 13 }),
                 "[json.exception.type_error.301] cannot create object from initializer list");
             }
 
@@ -1431,6 +1476,20 @@ TEST_CASE("constructors")
                         json j = 23.42;
                         json j_new(j.cbegin(), j.cend());
                         CHECK(j == j_new);
+                    }
+                }
+
+                SECTION("binary")
+                {
+                    {
+                        json j = json::binary({1, 2, 3});
+                        json j_new(j.begin(), j.end());
+                        CHECK((j == j_new));
+                    }
+                    {
+                        json j = json::binary({1, 2, 3});
+                        json j_new(j.cbegin(), j.cend());
+                        CHECK((j == j_new));
                     }
                 }
             }

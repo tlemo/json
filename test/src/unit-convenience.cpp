@@ -1,11 +1,12 @@
 /*
     __ _____ _____ _____
  __|  |   __|     |   | |  JSON for Modern C++ (test suite)
-|  |  |__   |  |  | | | |  version 3.1.2
+|  |  |__   |  |  | | | |  version 3.8.0
 |_____|_____|_____|_|___|  https://github.com/nlohmann/json
 
 Licensed under the MIT License <http://opensource.org/licenses/MIT>.
-Copyright (c) 2013-2018 Niels Lohmann <http://nlohmann.me>.
+SPDX-License-Identifier: MIT
+Copyright (c) 2013-2019 Niels Lohmann <http://nlohmann.me>.
 
 Permission is hereby  granted, free of charge, to any  person obtaining a copy
 of this software and associated  documentation files (the "Software"), to deal
@@ -26,12 +27,17 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "catch.hpp"
+#include "doctest_compatibility.h"
 
 #define private public
 #include <nlohmann/json.hpp>
 using nlohmann::json;
+#undef private
 
+#include <sstream>
+
+namespace
+{
 void check_escaped(const char* original, const char* escaped = "", const bool ensure_ascii = false);
 void check_escaped(const char* original, const char* escaped, const bool ensure_ascii)
 {
@@ -39,6 +45,7 @@ void check_escaped(const char* original, const char* escaped, const bool ensure_
     json::serializer s(nlohmann::detail::output_adapter<char>(ss), ' ');
     s.dump_escaped(original, ensure_ascii);
     CHECK(ss.str() == escaped);
+}
 }
 
 TEST_CASE("convenience functions")
@@ -51,6 +58,7 @@ TEST_CASE("convenience functions")
         CHECK(std::string(json(json::value_t::number_integer).type_name()) == "number");
         CHECK(std::string(json(json::value_t::number_unsigned).type_name()) == "number");
         CHECK(std::string(json(json::value_t::number_float).type_name()) == "number");
+        CHECK(std::string(json(json::value_t::binary).type_name()) == "binary");
         CHECK(std::string(json(json::value_t::boolean).type_name()) == "boolean");
         CHECK(std::string(json(json::value_t::string).type_name()) == "string");
         CHECK(std::string(json(json::value_t::discarded).type_name()) == "discarded");

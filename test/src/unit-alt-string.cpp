@@ -1,10 +1,11 @@
 /*
     __ _____ _____ _____
  __|  |   __|     |   | |  JSON for Modern C++ (test suite)
-|  |  |__   |  |  | | | |  version 3.1.2
+|  |  |__   |  |  | | | |  version 3.8.0
 |_____|_____|_____|_|___|  https://github.com/nlohmann/json
 
 Licensed under the MIT License <http://opensource.org/licenses/MIT>.
+SPDX-License-Identifier: MIT
 Copyright (c) 2018 Vitaliy Manushkin <agri@akamo.info>.
 
 Permission is hereby  granted, free of charge, to any  person obtaining a copy
@@ -26,11 +27,18 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "catch.hpp"
+#include "doctest_compatibility.h"
 
 #include <nlohmann/json.hpp>
+
 #include <string>
 #include <utility>
+
+
+/* forward declarations */
+class alt_string;
+bool operator<(const char* op1, const alt_string& op2);
+void int_to_string(alt_string& target, std::size_t value);
 
 /*
  * This is virtually a string class.
@@ -59,15 +67,25 @@ class alt_string
     }
 
     template <typename op_type>
-    bool operator==(op_type&& op) const
+    bool operator==(const op_type& op) const
     {
         return str_impl == op;
     }
 
+    bool operator==(const alt_string& op) const
+    {
+        return str_impl == op.str_impl;
+    }
+
     template <typename op_type>
-    bool operator!=(op_type&& op) const
+    bool operator!=(const op_type& op) const
     {
         return str_impl != op;
+    }
+
+    bool operator!=(const alt_string& op) const
+    {
+        return str_impl != op.str_impl;
     }
 
     std::size_t size() const noexcept
@@ -86,7 +104,7 @@ class alt_string
     }
 
     template <typename op_type>
-    bool operator<(op_type&& op) const
+    bool operator<(const op_type& op) const
     {
         return str_impl < op;
     }
@@ -132,9 +150,15 @@ class alt_string
     }
 
   private:
-    std::string str_impl;
+    std::string str_impl {};
+
+    friend bool ::operator<(const char*, const alt_string&);
 };
 
+void int_to_string(alt_string& target, std::size_t value)
+{
+    target = std::to_string(value).c_str();
+}
 
 using alt_json = nlohmann::basic_json <
                  std::map,
@@ -148,6 +172,10 @@ using alt_json = nlohmann::basic_json <
                  nlohmann::adl_serializer >;
 
 
+bool operator<(const char* op1, const alt_string& op2)
+{
+    return op1 < op2.str_impl;
+}
 
 TEST_CASE("alternative string type")
 {
@@ -197,9 +225,9 @@ TEST_CASE("alternative string type")
 
         {
             alt_json doc;
-            doc["list"] = { 1, 0, 2 };
+            doc["object"] = { {"currency", "USD"}, {"value", 42.99} };
             alt_string dump = doc.dump();
-            CHECK(dump == R"({"list":[1,0,2]})");
+            CHECK(dump == R"({"object":{"currency":"USD","value":42.99}})");
         }
     }
 
@@ -208,5 +236,64 @@ TEST_CASE("alternative string type")
         auto doc = alt_json::parse("{\"foo\": \"bar\"}");
         alt_string dump = doc.dump();
         CHECK(dump == R"({"foo":"bar"})");
+    }
+
+    SECTION("items")
+    {
+        auto doc = alt_json::parse("{\"foo\": \"bar\"}");
+
+        for ( auto item : doc.items() )
+        {
+            CHECK( item.key() == "foo" );
+            CHECK( item.value() == "bar" );
+        }
+
+        auto doc_array = alt_json::parse("[\"foo\", \"bar\"]");
+
+        for ( auto item : doc_array.items() )
+        {
+            if (item.key() == "0" )
+            {
+                CHECK( item.value() == "foo" );
+            }
+            else if (item.key() == "1" )
+            {
+                CHECK( item.value() == "bar" );
+            }
+            else
+            {
+                CHECK( false );
+            }
+        }
+    }
+
+    SECTION("equality")
+    {
+        alt_json doc;
+        doc["Who are you?"] = "I'm Batman";
+
+        CHECK("I'm Batman" == doc["Who are you?"]);
+        CHECK(doc["Who are you?"]  == "I'm Batman");
+        CHECK_FALSE("I'm Batman" != doc["Who are you?"]);
+        CHECK_FALSE(doc["Who are you?"]  != "I'm Batman");
+
+        CHECK("I'm Bruce Wayne" != doc["Who are you?"]);
+        CHECK(doc["Who are you?"]  != "I'm Bruce Wayne");
+        CHECK_FALSE("I'm Bruce Wayne" == doc["Who are you?"]);
+        CHECK_FALSE(doc["Who are you?"]  == "I'm Bruce Wayne");
+
+        {
+            const alt_json& const_doc = doc;
+
+            CHECK("I'm Batman" == const_doc["Who are you?"]);
+            CHECK(const_doc["Who are you?"] == "I'm Batman");
+            CHECK_FALSE("I'm Batman" != const_doc["Who are you?"]);
+            CHECK_FALSE(const_doc["Who are you?"] != "I'm Batman");
+
+            CHECK("I'm Bruce Wayne" != const_doc["Who are you?"]);
+            CHECK(const_doc["Who are you?"] != "I'm Bruce Wayne");
+            CHECK_FALSE("I'm Bruce Wayne" == const_doc["Who are you?"]);
+            CHECK_FALSE(const_doc["Who are you?"] == "I'm Bruce Wayne");
+        }
     }
 }

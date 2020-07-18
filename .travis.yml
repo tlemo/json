@@ -10,17 +10,6 @@ sudo: required
 group: edge
 
 
-###################
-# global settings #
-###################
-
-env:
-  global:
-   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
-   #   via the "travis encrypt" command using the project repo's public key
-   - secure: "m89SSgE+ASLO38rSKx7MTXK3n5NkP9bIx95jwY71YEiuFzib30PDJ/DifKnXxBjvy/AkCGztErQRk/8ZCvq+4HXozU2knEGnL/RUitvlwbhzfh2D4lmS3BvWBGS3N3NewoPBrRmdcvnT0xjOGXxtZaJ3P74TkB9GBnlz/HmKORA="
-
-
 ################
 # build matrix #
 ################
@@ -43,12 +32,15 @@ matrix:
   - os: linux
     compiler: clang
     env:
-      - COMPILER=clang++-5.0
+      - COMPILER=clang++-7
       - CMAKE_OPTIONS=-DJSON_Sanitizer=ON
+      - UBSAN_OPTIONS=print_stacktrace=1,suppressions=$(pwd)/test/src/UBSAN.supp
     addons:
       apt:
-        sources: ['ubuntu-toolchain-r-test', 'llvm-toolchain-trusty-5.0']
-        packages: ['g++-6', 'clang-5.0', 'ninja-build']
+        sources: ['ubuntu-toolchain-r-test', 'llvm-toolchain-trusty-7']
+        packages: ['g++-6', 'clang-7', 'ninja-build']
+    before_script:
+      - export PATH=$PATH:/usr/lib/llvm-7/bin
 
   # cppcheck
   - os: linux
@@ -92,16 +84,17 @@ matrix:
 
   - os: linux
     compiler: gcc
+    dist: bionic
     addons:
       apt:
         sources: ['ubuntu-toolchain-r-test']
-        packages: ['g++-4.9', 'ninja-build']
+        packages: ['g++-7', 'ninja-build']
     before_script:
       - pip install --user cpp-coveralls
     after_success:
-      - coveralls --build-root test --include include/nlohmann --gcov 'gcov-4.9' --gcov-options '\-lp'
+      - coveralls --build-root test --include include/nlohmann --gcov 'gcov-7' --gcov-options '\-lp'
     env:
-      - COMPILER=g++-4.9
+      - COMPILER=g++-7
       - CMAKE_OPTIONS=-DJSON_Coverage=ON
       - MULTIPLE_HEADERS=ON
 
@@ -125,37 +118,42 @@ matrix:
     env:
       - SPECIAL=coverity
       - COMPILER=clang++-3.6
+        # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+        #   via the "travis encrypt" command using the project repo's public key
+      - secure: "m89SSgE+ASLO38rSKx7MTXK3n5NkP9bIx95jwY71YEiuFzib30PDJ/DifKnXxBjvy/AkCGztErQRk/8ZCvq+4HXozU2knEGnL/RUitvlwbhzfh2D4lmS3BvWBGS3N3NewoPBrRmdcvnT0xjOGXxtZaJ3P74TkB9GBnlz/HmKORA="
 
   # OSX / Clang
 
   - os: osx
-    osx_image: xcode6.4
+    osx_image: xcode9.3
 
   - os: osx
-    osx_image: xcode7.3
+    osx_image: xcode9.4
 
   - os: osx
-    osx_image: xcode8
+    osx_image: xcode10
 
   - os: osx
-    osx_image: xcode8.1
+    osx_image: xcode10.1
 
   - os: osx
-    osx_image: xcode8.2
+    osx_image: xcode10.2
 
   - os: osx
-    osx_image: xcode8.3
+    osx_image: xcode11.2
 
   - os: osx
-    osx_image: xcode9
-
-  - os: osx
-    osx_image: xcode9.1
-
-  - os: osx
-    osx_image: xcode9.2
+    osx_image: xcode12
 
   # Linux / GCC
+
+  - os: linux
+    compiler: gcc
+    env: COMPILER=g++-4.8
+    addons:
+      apt:
+        sources: ['ubuntu-toolchain-r-test']
+        packages: ['g++-4.8', 'ninja-build']
 
   - os: linux
     compiler: gcc
@@ -191,13 +189,29 @@ matrix:
 
   - os: linux
     compiler: gcc
-    env:
-      - COMPILER=g++-7
-      - CXXFLAGS=-std=c++17
+    env: COMPILER=g++-8
     addons:
       apt:
         sources: ['ubuntu-toolchain-r-test']
-        packages: ['g++-7', 'ninja-build']
+        packages: ['g++-8', 'ninja-build']
+
+  - os: linux
+    compiler: gcc
+    env: COMPILER=g++-9
+    addons:
+      apt:
+        sources: ['ubuntu-toolchain-r-test']
+        packages: ['g++-9', 'ninja-build']
+
+  - os: linux
+    compiler: gcc
+    env:
+      - COMPILER=g++-9
+      - CXXFLAGS=-std=c++2a
+    addons:
+      apt:
+        sources: ['ubuntu-toolchain-r-test']
+        packages: ['g++-9', 'ninja-build']
 
   # Linux / Clang
 
@@ -259,13 +273,29 @@ matrix:
 
   - os: linux
     compiler: clang
+    env: COMPILER=clang++-6.0
+    addons:
+      apt:
+        sources: ['ubuntu-toolchain-r-test', 'llvm-toolchain-trusty-6.0']
+        packages: ['g++-6', 'clang-6.0', 'ninja-build']
+
+  - os: linux
+    compiler: clang
+    env: COMPILER=clang++-7
+    addons:
+      apt:
+        sources: ['ubuntu-toolchain-r-test', 'llvm-toolchain-trusty-7']
+        packages: ['g++-6', 'clang-7', 'ninja-build']
+
+  - os: linux
+    compiler: clang
     env:
-      - COMPILER=clang++-5.0
+      - COMPILER=clang++-7
       - CXXFLAGS=-std=c++1z
     addons:
       apt:
-        sources: ['ubuntu-toolchain-r-test', 'llvm-toolchain-trusty-5.0']
-        packages: ['g++-6', 'clang-5.0', 'ninja-build']
+        sources: ['ubuntu-toolchain-r-test', 'llvm-toolchain-trusty-7']
+        packages: ['g++-6', 'clang-7', 'ninja-build']
 
 ################
 # build script #
@@ -277,6 +307,7 @@ script:
      if [[ (-x $(which brew)) ]]; then
        brew update
        brew install cmake ninja
+       brew upgrade cmake
        cmake --version
      fi
 
@@ -285,14 +316,10 @@ script:
   # by default, use the single-header version
   - if [[ "${MULTIPLE_HEADERS}" == "" ]]; then export MULTIPLE_HEADERS=OFF; fi
 
-  # show OS/compiler version
-  - uname -a
-  - $CXX --version
-
   # compile and execute unit tests
   - mkdir -p build && cd build
-  - cmake .. ${CMAKE_OPTIONS} -DJSON_MultipleHeaders=${MULTIPLE_HEADERS} -GNinja && cmake --build . --config Release
-  - ctest -C Release -V -j
+  - cmake .. ${CMAKE_OPTIONS} -DJSON_MultipleHeaders=${MULTIPLE_HEADERS} -DJSON_BuildTests=On -GNinja && cmake --build . --config Release
+  - ctest -C Release --timeout 2700 -V -j
   - cd ..
 
   # check if homebrew works (only checks develop branch)   
